@@ -1,0 +1,69 @@
+stages:
+  - build
+  - codestyle_test
+  - functest_test
+  - deploy
+
+build-project:
+  stage: build
+  tags: 
+    - roxaneos
+  script: 
+    - cd src/cat/ && make all 
+    - cd ../grep/ && make all
+  artifacts:
+    paths: 
+      - src/cat/s21_cat
+      - src/grep/s21_grep
+    expire_in: 30 days
+  after_script:
+    - >
+      if [ $CI_JOB_STATUS != 'success' ]; then
+        sh src/tg_ci-msg.sh ❌BUILD FAILED❌
+      fi
+
+codestyle-project:
+  stage: codestyle_test
+  tags: 
+    - roxaneos
+  script:
+    - cd src/ && cp ../materials/linters/.clang-format . 
+    - clang-format -style=Google -Werror -n */*.c
+  after_script:
+    - >
+      if [ $CI_JOB_STATUS != 'success' ]; then
+        sh src/tg_ci-msg.sh ❌CODESTYLE FAILED❌
+      fi
+
+functest-project:
+  stage: functest_test
+  tags:
+    - roxaneos
+  when: on_success
+  script:
+    - cd src/cat/ && make test 
+    - cd ../grep/ && make test
+  after_script:
+    - >
+      if [ $CI_JOB_STATUS == 'success' ]; then
+        sh src/tg_ci-msg.sh ✅CI SUCCESS✅
+      else
+        sh src/tg_ci-msg.sh ❌CI FAILED❌
+      fi
+
+deploy-project:
+  stage: deploy
+  tags:
+    - roxaneos
+  when: on_success
+  when: manual
+  script:
+    - chmod +x src/script.sh
+    - sh src/script.sh
+  after_script:
+    - >
+      if [ $CI_JOB_STATUS == 'success' ]; then
+        sh src/tg_ci-msg.sh ✅CD SUCCESS✅
+      else
+        sh src/tg_ci-msg.sh ❌CD FAILED❌
+      fi
